@@ -16,9 +16,11 @@
 
 #include <healthd.h>
 
-void healthd_board_init(struct healthd_config*)
+void healthd_board_init(struct healthd_config* hc)
 {
     // use defaults
+    hc->periodic_chores_interval_fast = 0;
+    hc->periodic_chores_interval_slow = 0;
 }
 
 
