@@ -52,7 +52,7 @@ static void print_usage(void)
     printf ("  --op <0:fillrect, 1:blend, 2:strechblit, 3:blit>    ge2d operation case.\n");
     printf ("  --duration <milliseconds>    Duration of each ge2d operation case.\n");
     printf ("  --size     <width>x<height>  Set ge2d size.\n");
-    printf ("  --pixelformat <0:ARGB, 1:ABGR, 2:NV21>  Set ge2d pixelformat.\n");
+    printf ("  --pixelformat <define as pixel_format_t>  Set ge2d pixelformat.\n");
     printf ("  --help                       Print usage information.\n");
     printf ("\n");
 }
@@ -219,11 +219,11 @@ int main(int argc, char **argv)
     if (ret < 0)
         goto exit;
 
-
+    #if 0
     ret = aml_read_file(SRC_FILE_NAME,&ge2dinfo);
     if (ret < 0)
         goto exit;
-
+    #endif
     stime = myclock();
     for ( i = 0;i%100 || myclock()<(stime+DEMOTIME); i++) {
         ret = aml_ge2d_process(&ge2dinfo);

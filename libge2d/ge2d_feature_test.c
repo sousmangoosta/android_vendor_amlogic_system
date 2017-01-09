@@ -58,9 +58,6 @@ static void print_usage(void)
     printf ("Usage: ge2d_feature_test [options]\n\n");
     printf ("Options:\n\n");
     printf ("  --op <0:fillrect, 1:blend, 2:strechblit, 3:blit>    ge2d operation case.\n");
-    printf ("  --duration <milliseconds>    Duration of each ge2d operation case.\n");
-    printf ("  --size     <width>x<height>  Set ge2d size.\n");
-    printf ("  --pixelformat <0:ARGB, 1:ABGR, 2:NV21>  Set ge2d pixelformat.\n");
     printf ("  --help                       Print usage information.\n");
     printf ("\n");
 }
