@@ -319,10 +319,10 @@ static int ge2d_blit_config_ex(int fd,aml_ge2d_info_t *pge2dinfo)
 
     ge2d_config_ex.src_para.mem_type = input_buffer_info->memtype;
     ge2d_config_ex.src_para.format = src_format;
-    ge2d_config_ex.src_para.left = 0;
-    ge2d_config_ex.src_para.top = 0;
-    ge2d_config_ex.src_para.width = s_canvas_w;
-    ge2d_config_ex.src_para.height = s_canvas_h;
+    ge2d_config_ex.src_para.left = input_buffer_info->rect.x;
+    ge2d_config_ex.src_para.top = input_buffer_info->rect.y;
+    ge2d_config_ex.src_para.width = input_buffer_info->rect.w;
+    ge2d_config_ex.src_para.height = input_buffer_info->rect.h;
 
     ge2d_config_ex.src2_para.mem_type = CANVAS_TYPE_INVALID;
 
@@ -540,17 +540,17 @@ static int ge2d_blend_config_ex(int fd,aml_ge2d_info_t *pge2dinfo)
 
     ge2d_config_ex.src_para.mem_type = input_buffer_info->memtype;
     ge2d_config_ex.src_para.format = src_format;
-    ge2d_config_ex.src_para.left = 0;
-    ge2d_config_ex.src_para.top = 0;
-    ge2d_config_ex.src_para.width = s_canvas_w;
-    ge2d_config_ex.src_para.height = s_canvas_h;
+    ge2d_config_ex.src_para.left = input_buffer_info->rect.x;
+    ge2d_config_ex.src_para.top = input_buffer_info->rect.y;
+    ge2d_config_ex.src_para.width = input_buffer_info->rect.w;
+    ge2d_config_ex.src_para.height = input_buffer_info->rect.h;
 
     ge2d_config_ex.src2_para.mem_type = input2_buffer_info->memtype;
     ge2d_config_ex.src2_para.format = src2_format;
-    ge2d_config_ex.src2_para.left = 0;
-    ge2d_config_ex.src2_para.top = 0;
-    ge2d_config_ex.src2_para.width = s2_canvas_w;
-    ge2d_config_ex.src2_para.height = s2_canvas_h;
+    ge2d_config_ex.src2_para.left = input2_buffer_info->rect.x;
+    ge2d_config_ex.src2_para.top = input2_buffer_info->rect.y;
+    ge2d_config_ex.src2_para.width = input2_buffer_info->rect.w;
+    ge2d_config_ex.src2_para.height = input2_buffer_info->rect.h;
 
     ge2d_config_ex.dst_para.mem_type = output_buffer_info->memtype;
     ge2d_config_ex.dst_para.format = dst_format;
