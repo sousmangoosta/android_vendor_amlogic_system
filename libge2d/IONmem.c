@@ -96,6 +96,7 @@ unsigned long CMEM_alloc(size_t size, IONMEM_AllocParams *params)
         return -EINVAL;
     }
 
+    #if 0
     phy_data.handle = params->mImageFd;
     phy_data.phys_addr = 0;
     phy_data.size = 0;
@@ -113,6 +114,8 @@ unsigned long CMEM_alloc(size_t size, IONMEM_AllocParams *params)
     __D("allocate ion buffer for capture, ret=%d, bytes=%d, PysAdrr=%ld .\n",
         ret, size, PhyAdrr);
     return PhyAdrr;
+    #endif
+    return ret;
 }
 
 #if 0

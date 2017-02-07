@@ -57,11 +57,11 @@ void aml_ge2d_exit(void)
 
 void aml_ge2d_mem_free(aml_ge2d_info_t *pge2dinfo)
 {
-    if (pge2dinfo->src_info[0].paddr)
+    if (amlge2d.src_size)
         CMEM_free(&cmemParm_src);
-    if (pge2dinfo->src_info[1].paddr)
+    if (amlge2d.src2_size)
         CMEM_free(&cmemParm_src2);
-    if (pge2dinfo->dst_info.paddr)
+    if (amlge2d.dst_size)
         CMEM_free(&cmemParm_dst);
 
     if (pge2dinfo->src_info[0].vaddr)
@@ -153,13 +153,13 @@ int aml_ge2d_mem_alloc(aml_ge2d_info_t *pge2dinfo)
         }
     }
     if (amlge2d.src_size) {
-        pge2dinfo->src_info[0].paddr = (unsigned long)CMEM_alloc(amlge2d.src_size, &cmemParm_src);
-        if (!pge2dinfo->src_info[0].paddr) {
+        ret = CMEM_alloc(amlge2d.src_size, &cmemParm_src);
+        if (ret < 0) {
             E_GE2D("Not enough memory\n");
-            if (pge2dinfo->src_info[0].paddr)
-                CMEM_free(&cmemParm_src);
+            CMEM_free(&cmemParm_src);
             return ge2d_fail;
         }
+        pge2dinfo->src_info[0].shared_fd = cmemParm_src.mImageFd;
         pge2dinfo->src_info[0].vaddr = (char*)mmap( NULL, amlge2d.src_size,
             PROT_READ | PROT_WRITE, MAP_SHARED, cmemParm_src.mImageFd, 0);
 
@@ -171,13 +171,13 @@ int aml_ge2d_mem_alloc(aml_ge2d_info_t *pge2dinfo)
     }
 
     if (amlge2d.src2_size) {
-        pge2dinfo->src_info[1].paddr = (unsigned long)CMEM_alloc(amlge2d.src2_size, &cmemParm_src2);
-        if (!pge2dinfo->src_info[1].paddr) {
+        ret = CMEM_alloc(amlge2d.src2_size, &cmemParm_src2);
+        if (ret < 0) {
             E_GE2D("Not enough memory\n");
-            if (pge2dinfo->src_info[1].paddr)
-                CMEM_free(&cmemParm_src2);
+            CMEM_free(&cmemParm_src2);
             return ge2d_fail;
         }
+        pge2dinfo->src_info[1].shared_fd = cmemParm_src2.mImageFd;
         pge2dinfo->src_info[1].vaddr = (char*)mmap( NULL, amlge2d.src2_size,
             PROT_READ | PROT_WRITE, MAP_SHARED, cmemParm_src2.mImageFd, 0);
         if (!pge2dinfo->src_info[1].vaddr) {
@@ -188,11 +188,12 @@ int aml_ge2d_mem_alloc(aml_ge2d_info_t *pge2dinfo)
 
 
     if (amlge2d.dst_size) {
-        pge2dinfo->dst_info.paddr = (unsigned long)CMEM_alloc(amlge2d.dst_size, &cmemParm_dst);
-        if (!pge2dinfo->dst_info.paddr) {
+        ret = CMEM_alloc(amlge2d.dst_size, &cmemParm_dst);
+        if (ret < 0) {
             E_GE2D("Not enough memory\n");
             goto exit;
         }
+        pge2dinfo->dst_info.shared_fd = cmemParm_dst.mImageFd;
         pge2dinfo->dst_info.vaddr = (char*)mmap( NULL, amlge2d.dst_size,
             PROT_READ | PROT_WRITE, MAP_SHARED, cmemParm_dst.mImageFd, 0);
 
@@ -212,16 +213,16 @@ int aml_ge2d_mem_alloc(aml_ge2d_info_t *pge2dinfo)
         amlge2d.src_size,amlge2d.src2_size,amlge2d.dst_size);
     return ge2d_success;
 exit:
-    if (pge2dinfo->src_info[0].paddr)
+    if (amlge2d.src_size)
         CMEM_free(&cmemParm_src);
-    if (pge2dinfo->src_info[1].paddr)
+    if (amlge2d.src2_size)
         CMEM_free(&cmemParm_src2);
 
     if (pge2dinfo->src_info[0].vaddr)
         munmap(pge2dinfo->src_info[0].vaddr, amlge2d.src_size);
     if (pge2dinfo->src_info[1].vaddr)
         munmap(pge2dinfo->src_info[1].vaddr, amlge2d.src2_size);
-    if (pge2dinfo->dst_info.paddr)
+    if (amlge2d.dst_size)
         CMEM_free(&cmemParm_dst);
     if (pge2dinfo->dst_info.vaddr)
         munmap(pge2dinfo->dst_info.vaddr, amlge2d.dst_size);

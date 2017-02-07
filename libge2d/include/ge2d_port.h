@@ -82,12 +82,13 @@ typedef struct{
 typedef struct buffer_info {
     unsigned int memtype;
     char* vaddr;
-    unsigned long paddr;
+    unsigned long offset;
     unsigned int canvas_w;
     unsigned int canvas_h;
     rectangle_t rect;
     int format;
     unsigned int rotation;
+    int shared_fd;
 } buffer_info_t;
 
 
