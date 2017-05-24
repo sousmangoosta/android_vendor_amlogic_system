@@ -11,7 +11,7 @@
 #include <cutils/log.h>
 
 
-#define __DEBUG
+//#define __DEBUG
 
 #ifdef __DEBUG
 #define D_GE2D(fmt, args...) ALOGD("GE2D Debug: " fmt, ## args)

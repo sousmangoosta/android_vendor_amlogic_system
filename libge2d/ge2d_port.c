@@ -119,8 +119,7 @@ static int is_no_alpha(int format)
 
 static int is_nv21(int format)
 {
-    if ((format == PIXEL_FORMAT_YCrCb_420_SP)||
-        (format == PIXEL_FORMAT_YV12))
+    if (format == PIXEL_FORMAT_YCrCb_420_SP)
         return 1;
     else
         return 0;
@@ -243,12 +242,13 @@ static int ge2d_fillrectangle_config_ex_ion(int fd,aml_ge2d_info_t *pge2dinfo)
             ge2d_config_ex.dst_planes[0].shared_fd = output_buffer_info->shared_fd;
             ge2d_config_ex.dst_planes[0].w = d_canvas_w;
             ge2d_config_ex.dst_planes[0].h = d_canvas_h;
-            ge2d_config_ex.dst_planes[1].addr = (d_canvas_w * d_canvas_h);
-            ge2d_config_ex.dst_planes[1].w = d_canvas_w;
-            ge2d_config_ex.dst_planes[1].h = d_canvas_h/4;
-            ge2d_config_ex.dst_planes[2].addr = (d_canvas_w * d_canvas_h)*5/4;
-            ge2d_config_ex.dst_planes[2].w = d_canvas_w;
-            ge2d_config_ex.dst_planes[2].h = d_canvas_h/4;
+            /* android is ycrcb,kernel is ycbcr,swap the addr */
+            ge2d_config_ex.dst_planes[1].addr = (d_canvas_w * d_canvas_h)*5/4;
+            ge2d_config_ex.dst_planes[1].w = d_canvas_w/2;
+            ge2d_config_ex.dst_planes[1].h = d_canvas_h/2;
+            ge2d_config_ex.dst_planes[2].addr = (d_canvas_w * d_canvas_h);
+            ge2d_config_ex.dst_planes[2].w = d_canvas_w/2;
+            ge2d_config_ex.dst_planes[2].h = d_canvas_h/2;
         } else if (output_buffer_info->format == PIXEL_FORMAT_YCbCr_422_SP) {
             ge2d_config_ex.dst_planes[0].addr = output_buffer_info->offset;
             ge2d_config_ex.dst_planes[0].shared_fd = output_buffer_info->shared_fd;
@@ -399,12 +399,13 @@ static int ge2d_blit_config_ex_ion(int fd,aml_ge2d_info_t *pge2dinfo)
             ge2d_config_ex.src_planes[0].shared_fd = input_buffer_info->shared_fd;
             ge2d_config_ex.src_planes[0].w = s_canvas_w;
             ge2d_config_ex.src_planes[0].h = s_canvas_h;
-            ge2d_config_ex.src_planes[1].addr = (s_canvas_w * s_canvas_h);
-            ge2d_config_ex.src_planes[1].w = s_canvas_w;
-            ge2d_config_ex.src_planes[1].h = s_canvas_h/4;
-            ge2d_config_ex.src_planes[2].addr = (s_canvas_w * s_canvas_h)*5/4;
-            ge2d_config_ex.src_planes[2].w = s_canvas_w;
-            ge2d_config_ex.src_planes[2].h = s_canvas_h/4;
+            /* android is ycrcb,kernel is ycbcr,swap the addr */
+            ge2d_config_ex.src_planes[1].addr = (s_canvas_w * s_canvas_h)*5/4;
+            ge2d_config_ex.src_planes[1].w = s_canvas_w/2;
+            ge2d_config_ex.src_planes[1].h = s_canvas_h/2;
+            ge2d_config_ex.src_planes[2].addr = (s_canvas_w * s_canvas_h);
+            ge2d_config_ex.src_planes[2].w = s_canvas_w/2;
+            ge2d_config_ex.src_planes[2].h = s_canvas_h/2;
         } else if (input_buffer_info->format == PIXEL_FORMAT_YCbCr_422_SP) {
             ge2d_config_ex.src_planes[0].addr = input_buffer_info->offset;
             ge2d_config_ex.src_planes[0].shared_fd = input_buffer_info->shared_fd;
@@ -449,12 +450,13 @@ static int ge2d_blit_config_ex_ion(int fd,aml_ge2d_info_t *pge2dinfo)
             ge2d_config_ex.dst_planes[0].shared_fd = output_buffer_info->shared_fd;
             ge2d_config_ex.dst_planes[0].w = d_canvas_w;
             ge2d_config_ex.dst_planes[0].h = d_canvas_h;
-            ge2d_config_ex.dst_planes[1].addr = (d_canvas_w * d_canvas_h);
-            ge2d_config_ex.dst_planes[1].w = d_canvas_w;
-            ge2d_config_ex.dst_planes[1].h = d_canvas_h/4;
-            ge2d_config_ex.dst_planes[2].addr = (d_canvas_w * d_canvas_h)*5/4;
-            ge2d_config_ex.dst_planes[2].w = d_canvas_w;
-            ge2d_config_ex.dst_planes[2].h = d_canvas_h/4;
+            /* android is ycrcb,kernel is ycbcr,swap the addr */
+            ge2d_config_ex.dst_planes[1].addr = (d_canvas_w * d_canvas_h)*5/4;
+            ge2d_config_ex.dst_planes[1].w = d_canvas_w/2;
+            ge2d_config_ex.dst_planes[1].h = d_canvas_h/2;
+            ge2d_config_ex.dst_planes[2].addr = (d_canvas_w * d_canvas_h);
+            ge2d_config_ex.dst_planes[2].w = d_canvas_w/2;
+            ge2d_config_ex.dst_planes[2].h = d_canvas_h/2;
         } else if (output_buffer_info->format == PIXEL_FORMAT_YCbCr_422_SP) {
             ge2d_config_ex.dst_planes[0].addr = output_buffer_info->offset;
             ge2d_config_ex.dst_planes[0].shared_fd = output_buffer_info->shared_fd;
@@ -655,12 +657,13 @@ static int ge2d_blend_config_ex_ion(int fd,aml_ge2d_info_t *pge2dinfo)
             ge2d_config_ex.src_planes[0].shared_fd = input_buffer_info->shared_fd;
             ge2d_config_ex.src_planes[0].w = s_canvas_w;
             ge2d_config_ex.src_planes[0].h = s_canvas_h;
-            ge2d_config_ex.src_planes[1].addr = (s_canvas_w * s_canvas_h);
-            ge2d_config_ex.src_planes[1].w = s_canvas_w;
-            ge2d_config_ex.src_planes[1].h = s_canvas_h/4;
-            ge2d_config_ex.src_planes[2].addr = (s_canvas_w * s_canvas_h)*5/4;
-            ge2d_config_ex.src_planes[2].w = s_canvas_w;
-            ge2d_config_ex.src_planes[2].h = s_canvas_h/4;
+            /* android is ycrcb,kernel is ycbcr,swap the addr */
+            ge2d_config_ex.src_planes[1].addr = (s_canvas_w * s_canvas_h)*5/4;
+            ge2d_config_ex.src_planes[1].w = s_canvas_w/2;
+            ge2d_config_ex.src_planes[1].h = s_canvas_h/2;
+            ge2d_config_ex.src_planes[2].addr = (s_canvas_w * s_canvas_h);
+            ge2d_config_ex.src_planes[2].w = s_canvas_w/2;
+            ge2d_config_ex.src_planes[2].h = s_canvas_h/2;
         } else if (input_buffer_info->format == PIXEL_FORMAT_YCbCr_422_SP) {
             ge2d_config_ex.src_planes[0].addr = input_buffer_info->offset;
             ge2d_config_ex.src_planes[0].shared_fd = input_buffer_info->shared_fd;
@@ -706,12 +709,13 @@ static int ge2d_blend_config_ex_ion(int fd,aml_ge2d_info_t *pge2dinfo)
             ge2d_config_ex.src2_planes[0].shared_fd = input2_buffer_info->shared_fd;
             ge2d_config_ex.src2_planes[0].w = s2_canvas_w;
             ge2d_config_ex.src2_planes[0].h = s2_canvas_h;
-            ge2d_config_ex.src2_planes[1].addr = (s2_canvas_w * s2_canvas_h);
-            ge2d_config_ex.src2_planes[1].w = s2_canvas_w;
-            ge2d_config_ex.src2_planes[1].h = s2_canvas_h/4;
-            ge2d_config_ex.src2_planes[2].addr = (s2_canvas_w * s2_canvas_h)*5/4;
-            ge2d_config_ex.src2_planes[2].w = s2_canvas_w;
-            ge2d_config_ex.src2_planes[2].h = s2_canvas_h/4;
+            /* android is ycrcb,kernel is ycbcr,swap the addr */
+            ge2d_config_ex.src2_planes[1].addr = (s2_canvas_w * s2_canvas_h)*5/4;
+            ge2d_config_ex.src2_planes[1].w = s2_canvas_w/2;
+            ge2d_config_ex.src2_planes[1].h = s2_canvas_h/2;
+            ge2d_config_ex.src2_planes[2].addr = (s2_canvas_w * s2_canvas_h);
+            ge2d_config_ex.src2_planes[2].w = s2_canvas_w/2;
+            ge2d_config_ex.src2_planes[2].h = s2_canvas_h/2;
         } else if (input2_buffer_info->format == PIXEL_FORMAT_YCbCr_422_SP) {
             ge2d_config_ex.src2_planes[0].addr = input2_buffer_info->offset;
             ge2d_config_ex.src2_planes[0].shared_fd = input2_buffer_info->shared_fd;
@@ -756,12 +760,13 @@ static int ge2d_blend_config_ex_ion(int fd,aml_ge2d_info_t *pge2dinfo)
             ge2d_config_ex.dst_planes[0].shared_fd = output_buffer_info->shared_fd;
             ge2d_config_ex.dst_planes[0].w = d_canvas_w;
             ge2d_config_ex.dst_planes[0].h = d_canvas_h;
-            ge2d_config_ex.dst_planes[1].addr = (d_canvas_w * d_canvas_h);
-            ge2d_config_ex.dst_planes[1].w = d_canvas_w;
-            ge2d_config_ex.dst_planes[1].h = d_canvas_h/4;
-            ge2d_config_ex.dst_planes[2].addr = (d_canvas_w * d_canvas_h)*5/4;
-            ge2d_config_ex.dst_planes[2].w = d_canvas_w;
-            ge2d_config_ex.dst_planes[2].h = d_canvas_h/4;
+            /* android is ycrcb,kernel is ycbcr,swap the addr */
+            ge2d_config_ex.dst_planes[1].addr = (d_canvas_w * d_canvas_h)*5/4;
+            ge2d_config_ex.dst_planes[1].w = d_canvas_w/2;
+            ge2d_config_ex.dst_planes[1].h = d_canvas_h/2;
+            ge2d_config_ex.dst_planes[2].addr = (d_canvas_w * d_canvas_h);
+            ge2d_config_ex.dst_planes[2].w = d_canvas_w/2;
+            ge2d_config_ex.dst_planes[2].h = d_canvas_h/2;
         } else if (output_buffer_info->format == PIXEL_FORMAT_YCbCr_422_SP) {
             ge2d_config_ex.dst_planes[0].addr = output_buffer_info->offset;
             ge2d_config_ex.dst_planes[0].shared_fd = output_buffer_info->shared_fd;
