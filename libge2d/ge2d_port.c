@@ -117,9 +117,11 @@ static int is_no_alpha(int format)
         return 0;
 }
 
-static int is_nv21(int format)
+static int is_need_swap_src2(int format)
 {
-    if (format == PIXEL_FORMAT_YCrCb_420_SP)
+    /* src2 not support nv21/nv12/yv12, swap src1 and src2 */
+    if ((format == PIXEL_FORMAT_YCrCb_420_SP) ||
+        (format == PIXEL_FORMAT_YV12))
         return 1;
     else
         return 0;
@@ -506,8 +508,8 @@ static int ge2d_blend_config_ex_ion(int fd,aml_ge2d_info_t *pge2dinfo)
     buffer_info_t* input_buffer_info = &pge2dinfo->src_info[0];
     buffer_info_t* input2_buffer_info = &pge2dinfo->src_info[1];
     buffer_info_t* output_buffer_info = &pge2dinfo->dst_info;
-    /* src2 not support nv21/nv12, swap src1 and src2 */
-    if (is_nv21(input2_buffer_info->format)) {
+    /* src2 not support nv21/nv12/yv12, swap src1 and src2 */
+    if (is_need_swap_src2(input2_buffer_info->format)) {
         input_buffer_info = &pge2dinfo->src_info[1];
         input2_buffer_info = &pge2dinfo->src_info[0];
         b_src_swap = 1;
