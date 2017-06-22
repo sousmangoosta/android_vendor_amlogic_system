@@ -8,6 +8,11 @@ LOCAL_SHARED_LIBRARIES := liblog
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/include $(LOCAL_PATH)/kernel-headers
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include $(LOCAL_PATH)/kernel-headers
 LOCAL_CFLAGS := -Werror
+
+ifeq ($(shell test $(PLATFORM_SDK_VERSION) -ge 26 && echo OK),OK)
+LOCAL_PROPRIETARY_MODULE := true
+endif
+
 include $(BUILD_SHARED_LIBRARY)
 
 
@@ -33,6 +38,11 @@ LOCAL_CFLAGS +=-g
 LOCAL_CPPFLAGS := -g
 
 LOCAL_MODULE := ge2d_feature_test
+
+ifeq ($(shell test $(PLATFORM_SDK_VERSION) -ge 26 && echo OK),OK)
+LOCAL_PROPRIETARY_MODULE := true
+endif
+
 include $(BUILD_EXECUTABLE)
 
 
@@ -59,4 +69,9 @@ LOCAL_CFLAGS +=-g
 LOCAL_CPPFLAGS := -g
 
 LOCAL_MODULE := ge2d_load_test
+
+ifeq ($(shell test $(PLATFORM_SDK_VERSION) -ge 26 && echo OK),OK)
+LOCAL_PROPRIETARY_MODULE := true
+endif
+
 include $(BUILD_EXECUTABLE)
