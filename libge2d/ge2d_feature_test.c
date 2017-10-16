@@ -20,24 +20,28 @@
 
 
 /* #define FILE_DATA */
-#define SRC1_FILE_NAME   ("/system/bin/infocus.yuv")
-#define SRC_FILE_NAME   ("/system/bin/fb0.rgb32")
-#define DST_FILE_NAME   ("/system/bin/out1.rgb32")
+#define SRC1_FILE_NAME   ("./fb1.raw")
+#define SRC2_FILE_NAME   ("./fb2.raw")
+#define SRC_FILE_NAME   ("./fb.raw")
+#define DST_FILE_NAME   ("./out1.rgb32")
 
-static int SX_SRC1 = 1920;
-static int SY_SRC1 = 1080;
-static int SX_SRC2 = 1920;
-static int SY_SRC2 = 1080;
-static int SX_DST = 1920;
-static int SY_DST = 1080;
+static int SX_SRC1 = 1280;
+static int SY_SRC1 = 720;
+static int SX_SRC2 = 1280;
+static int SY_SRC2 = 720;
+static int SX_DST = 1280;
+static int SY_DST = 720;
 
 static int DEMOTIME = 3000;  /* milliseconds */
 static int SRC1_PIXFORMAT = PIXEL_FORMAT_RGBA_8888;
-static int SRC2_PIXFORMAT = PIXEL_FORMAT_YCrCb_420_SP;
+static int SRC2_PIXFORMAT = PIXEL_FORMAT_RGBA_8888;
 static int DST_PIXFORMAT = PIXEL_FORMAT_RGBA_8888;
 
 static int OP = AML_GE2D_STRETCHBLIT;
-
+static int src1_layer_mode = 0;
+static int src2_layer_mode = 0;
+static int gb1_alpha = 0xff;
+static int gb2_alpha = 0xff;
 extern aml_ge2d_t amlge2d;
 
 static void set_ge2dinfo(aml_ge2d_info_t *pge2dinfo)
@@ -58,7 +62,7 @@ static void set_ge2dinfo(aml_ge2d_info_t *pge2dinfo)
     pge2dinfo->dst_info.rotation = GE2D_ROTATION_0;
     pge2dinfo->offset = 0;
     pge2dinfo->ge2d_op = OP;
-    pge2dinfo->blend_mode = BLEND_MODE_PREMULTIPLIED;
+    //pge2dinfo->blend_mode = BLEND_MODE_PREMULTIPLIED;
 }
 
 static void print_usage(void)
@@ -83,6 +87,22 @@ static int parse_command_line(int argc, char *argv[])
             }
             else if (strcmp (argv[i] + 2, "op") == 0 && ++i < argc &&
                 sscanf (argv[i], "%d", &OP) == 1) {
+                continue;
+            }
+            else if (strcmp (argv[i] + 2, "bo1") == 0 && ++i < argc &&
+                sscanf (argv[i], "%d", &src1_layer_mode) == 1) {
+                continue;
+            }
+            else if (strcmp (argv[i] + 2, "bo2") == 0 && ++i < argc &&
+                sscanf (argv[i], "%d", &src2_layer_mode) == 1) {
+                continue;
+            }
+            else if (strcmp (argv[i] + 2, "gb1") == 0 && ++i < argc &&
+                sscanf (argv[i], "%d", &gb1_alpha) == 1) {
+                continue;
+            }
+            else if (strcmp (argv[i] + 2, "gb2") == 0 && ++i < argc &&
+                sscanf (argv[i], "%d", &gb2_alpha) == 1) {
                 continue;
             }
         }
@@ -158,6 +178,7 @@ int aml_write_file(const char* url , aml_ge2d_info_t *pge2dinfo)
     int fd = -1;
     int length = 0;
     int write_num = 0;
+    unsigned int *value;
     if (amlge2d.dst_size == 0)
         return 0;
     if ((GE2D_CANVAS_OSD0 == pge2dinfo->dst_info.memtype)
@@ -177,7 +198,15 @@ int aml_write_file(const char* url , aml_ge2d_info_t *pge2dinfo)
     }
 
     memcpy(amlge2d.dst_data,pge2dinfo->dst_info.vaddr,amlge2d.dst_size);
-
+    printf("pixel: 0x%2x, 0x%2x,0x%2x,0x%2x, 0x%2x,0x%2x,0x%2x,0x%2x\n",
+        amlge2d.dst_data[0],
+        amlge2d.dst_data[1],
+        amlge2d.dst_data[2],
+        amlge2d.dst_data[3],
+        amlge2d.dst_data[4],
+        amlge2d.dst_data[5],
+        amlge2d.dst_data[6],
+        amlge2d.dst_data[7]);
     write_num = write(fd,amlge2d.dst_data,amlge2d.dst_size);
     if (write_num <= 0) {
         E_GE2D("read file read_num=%d error\n",write_num);
@@ -191,6 +220,13 @@ static int do_fill_rectangle(aml_ge2d_info_t *pge2dinfo)
 {
     int ret = -1;
     char code;
+    ret = aml_read_file_src1(SRC_FILE_NAME,pge2dinfo);
+    if (ret < 0)
+       return  ge2d_fail;
+    ret = aml_read_file_src2(SRC1_FILE_NAME,pge2dinfo);
+    if (ret < 0)
+       return ge2d_fail;
+
     printf("do_fill_rectangle test case:\n");
     pge2dinfo->src_info[0].memtype = GE2D_CANVAS_ALLOC;
     pge2dinfo->dst_info.memtype = GE2D_CANVAS_OSD0;
@@ -236,53 +272,400 @@ static int do_blend(aml_ge2d_info_t *pge2dinfo)
 {
     int ret = -1;
     char code = 0;
+    int shared_fd_bakup;
+    unsigned long offset_bakup = 0;
+
     printf("do_blend test case:\n");
+
     pge2dinfo->src_info[0].memtype = GE2D_CANVAS_ALLOC;
     pge2dinfo->src_info[1].memtype = GE2D_CANVAS_ALLOC;
     pge2dinfo->dst_info.memtype = GE2D_CANVAS_ALLOC;
-    pge2dinfo->src_info[0].canvas_w = SX_SRC1;
-    pge2dinfo->src_info[0].canvas_h = SY_SRC1;
-    pge2dinfo->src_info[0].format = SRC1_PIXFORMAT;
-    pge2dinfo->src_info[1].canvas_w = SX_SRC2;
-    pge2dinfo->src_info[1].canvas_h = SY_SRC2;
-    pge2dinfo->src_info[1].format = SRC2_PIXFORMAT;
-    pge2dinfo->dst_info.canvas_w = SX_DST;
-    pge2dinfo->dst_info.canvas_h = SY_DST;
-    pge2dinfo->dst_info.format = DST_PIXFORMAT;
+    if (((gb1_alpha != 0xff)
+        && (gb2_alpha != 0xff))){
+        printf("two steps blend,two plane alpha\n");
 
-    pge2dinfo->src_info[0].rect.x = 0;
-    pge2dinfo->src_info[0].rect.y = 0;
-    pge2dinfo->src_info[0].rect.w = pge2dinfo->src_info[0].canvas_w;
-    pge2dinfo->src_info[0].rect.h = pge2dinfo->src_info[0].canvas_h;
-    pge2dinfo->src_info[1].rect.x = 0;
-    pge2dinfo->src_info[1].rect.y = 0;
-    pge2dinfo->src_info[1].rect.w = pge2dinfo->src_info[0].canvas_w;
-    pge2dinfo->src_info[1].rect.h = pge2dinfo->src_info[0].canvas_h;
-    pge2dinfo->dst_info.rect.x = 0;
-    pge2dinfo->dst_info.rect.y = 0;
-    pge2dinfo->dst_info.rect.w = pge2dinfo->src_info[0].canvas_w;
-    pge2dinfo->dst_info.rect.h = pge2dinfo->src_info[0].canvas_h;
-    pge2dinfo->dst_info.rotation = GE2D_ROTATION_0;
-    ret = aml_ge2d_process(pge2dinfo);
+        if (src2_layer_mode == LAYER_MODE_COVERAGE) {
+            printf("two steps blend,src2 LAYER_MODE_COVERAGE\n");
+            ret = aml_read_file_src1(SRC1_FILE_NAME,pge2dinfo);
+            if (ret < 0)
+               return  ge2d_fail;
 
-    sleep(5);
-    printf("please enter any key do rotation test[90]\n");
-    code = getc(stdin);
-    pge2dinfo->dst_info.rotation = GE2D_ROTATION_90;
-    pge2dinfo->dst_info.rect.w = pge2dinfo->src_info[0].canvas_w/2;
-    pge2dinfo->dst_info.rect.h = pge2dinfo->src_info[0].canvas_h/2;
-    ret = aml_ge2d_process(pge2dinfo);
+            /* both plane alpha, do 2 steps */
+            /* step 1: strechbilt */
+            pge2dinfo->ge2d_op = AML_GE2D_BLEND;
+            /* src2 do strechbilt to dst */
+            pge2dinfo->src_info[0].canvas_w = SX_SRC1;
+            pge2dinfo->src_info[0].canvas_h = SY_SRC1;
+            pge2dinfo->src_info[0].format = SRC1_PIXFORMAT;
+            pge2dinfo->src_info[0].rect.x = 0;
+            pge2dinfo->src_info[0].rect.y = 0;
+            pge2dinfo->src_info[0].rect.w = pge2dinfo->src_info[0].canvas_w;
+            pge2dinfo->src_info[0].rect.h = pge2dinfo->src_info[0].canvas_h;
+            pge2dinfo->src_info[0].fill_color_en = 0;
+
+            pge2dinfo->src_info[1].canvas_w = SX_DST;
+            pge2dinfo->src_info[1].canvas_h = SY_DST;
+            pge2dinfo->src_info[1].format = DST_PIXFORMAT;
+            pge2dinfo->src_info[1].rect.x = 0;
+            pge2dinfo->src_info[1].rect.y = 0;
+            pge2dinfo->src_info[1].rect.w = pge2dinfo->src_info[0].canvas_w;
+            pge2dinfo->src_info[1].rect.h = pge2dinfo->src_info[0].canvas_h;
+            pge2dinfo->src_info[1].fill_color_en = 1;
+            pge2dinfo->src_info[1].def_color = 0x00;
+
+            pge2dinfo->dst_info.canvas_w = SX_DST;
+            pge2dinfo->dst_info.canvas_h = SY_DST;
+            pge2dinfo->dst_info.format = DST_PIXFORMAT;
+            pge2dinfo->dst_info.rect.x = 0;
+            pge2dinfo->dst_info.rect.y = 0;
+            pge2dinfo->dst_info.rect.w = pge2dinfo->src_info[0].canvas_w;
+            pge2dinfo->dst_info.rect.h = pge2dinfo->src_info[0].canvas_h;
+            pge2dinfo->dst_info.rotation = GE2D_ROTATION_0;
+
+            pge2dinfo->src_info[0].layer_mode = LAYER_MODE_COVERAGE;
+            pge2dinfo->src_info[1].layer_mode = LAYER_MODE_COVERAGE;
+            pge2dinfo->src_info[0].plane_alpha = gb2_alpha;
+            pge2dinfo->src_info[1].plane_alpha = 0xff;
+            ret = aml_ge2d_process(pge2dinfo);
+            ret = aml_read_file_src1(SRC_FILE_NAME,pge2dinfo);
+            if (ret < 0)
+               return  ge2d_fail;
+
+            /* step2: blend src1 blend src2(dst) to dst */
+            pge2dinfo->ge2d_op = AML_GE2D_BLEND;
+
+            pge2dinfo->src_info[0].canvas_w = SX_SRC1;
+            pge2dinfo->src_info[0].canvas_h = SY_SRC1;
+            pge2dinfo->src_info[0].format = SRC1_PIXFORMAT;
+            pge2dinfo->src_info[0].rect.x = 0;
+            pge2dinfo->src_info[0].rect.y = 0;
+            pge2dinfo->src_info[0].rect.w = pge2dinfo->src_info[0].canvas_w;
+            pge2dinfo->src_info[0].rect.h = pge2dinfo->src_info[0].canvas_h;
+            pge2dinfo->src_info[0].fill_color_en = 0;
+
+            pge2dinfo->src_info[1].canvas_w = pge2dinfo->dst_info.canvas_w;
+            pge2dinfo->src_info[1].canvas_h = pge2dinfo->dst_info.canvas_h;
+            pge2dinfo->src_info[1].format = pge2dinfo->dst_info.format;
+            pge2dinfo->src_info[1].rect.x = pge2dinfo->dst_info.rect.x;
+            pge2dinfo->src_info[1].rect.y = pge2dinfo->dst_info.rect.y;
+            pge2dinfo->src_info[1].rect.w = pge2dinfo->dst_info.rect.w;
+            pge2dinfo->src_info[1].rect.h = pge2dinfo->dst_info.rect.h;
+            pge2dinfo->src_info[1].shared_fd = pge2dinfo->dst_info.shared_fd;
+            pge2dinfo->src_info[1].offset = pge2dinfo->dst_info.offset;
+            pge2dinfo->src_info[1].fill_color_en = 0;
+
+            pge2dinfo->dst_info.canvas_w = SX_DST;
+            pge2dinfo->dst_info.canvas_h = SY_DST;
+            pge2dinfo->dst_info.format = DST_PIXFORMAT;
+            pge2dinfo->dst_info.rect.x = 0;
+            pge2dinfo->dst_info.rect.y = 0;
+            pge2dinfo->dst_info.rect.w = pge2dinfo->src_info[0].canvas_w;
+            pge2dinfo->dst_info.rect.h = pge2dinfo->src_info[0].canvas_h;
+            pge2dinfo->dst_info.rotation = GE2D_ROTATION_0;
+
+            pge2dinfo->src_info[0].layer_mode = src1_layer_mode;
+            pge2dinfo->src_info[1].layer_mode = src2_layer_mode;
+            pge2dinfo->src_info[0].plane_alpha = gb1_alpha;
+            pge2dinfo->src_info[1].plane_alpha = gb2_alpha;
+            ret = aml_ge2d_process(pge2dinfo);
+        } else {
+            ret = aml_read_file_src1(SRC_FILE_NAME,pge2dinfo);
+            if (ret < 0)
+               return  ge2d_fail;
+            ret = aml_read_file_src2(SRC1_FILE_NAME,pge2dinfo);
+            if (ret < 0)
+               return ge2d_fail;
+            printf("two step: strechbilt+blend\n");
+            /* both plane alpha, do 2 steps */
+            /* step 1: strechbilt */
+            pge2dinfo->ge2d_op = AML_GE2D_STRETCHBLIT;
+            /* src2 do strechbilt to dst */
+            pge2dinfo->src_info[0].canvas_w = SX_SRC2;
+            pge2dinfo->src_info[0].canvas_h = SY_SRC2;
+            pge2dinfo->src_info[0].format = SRC2_PIXFORMAT;
+            pge2dinfo->src_info[0].rect.x = 0;
+            pge2dinfo->src_info[0].rect.y = 0;
+            pge2dinfo->src_info[0].rect.w = pge2dinfo->src_info[0].canvas_w;
+            pge2dinfo->src_info[0].rect.h = pge2dinfo->src_info[0].canvas_h;
+
+            shared_fd_bakup = pge2dinfo->src_info[0].shared_fd;
+            offset_bakup = pge2dinfo->src_info[0].offset;
+            pge2dinfo->src_info[0].shared_fd = pge2dinfo->src_info[1].shared_fd;
+            pge2dinfo->src_info[0].offset = pge2dinfo->src_info[1].offset;
+
+            pge2dinfo->src_info[0].layer_mode = src2_layer_mode;
+            pge2dinfo->src_info[0].plane_alpha = gb2_alpha;
+            pge2dinfo->dst_info.canvas_w = SX_DST;
+            pge2dinfo->dst_info.canvas_h = SY_DST;
+            pge2dinfo->dst_info.format = DST_PIXFORMAT;
+            pge2dinfo->dst_info.rect.x = 0;
+            pge2dinfo->dst_info.rect.y = 0;
+            pge2dinfo->dst_info.rect.w = pge2dinfo->src_info[0].canvas_w;
+            pge2dinfo->dst_info.rect.h = pge2dinfo->src_info[0].canvas_h;
+            pge2dinfo->dst_info.rotation = GE2D_ROTATION_0;
+            ret = aml_ge2d_process(pge2dinfo);
+
+            /* step2: blend src1 blend src2(dst) to dst */
+            pge2dinfo->ge2d_op = AML_GE2D_BLEND;
+
+            pge2dinfo->src_info[0].canvas_w = SX_SRC1;
+            pge2dinfo->src_info[0].canvas_h = SY_SRC1;
+            pge2dinfo->src_info[0].format = SRC1_PIXFORMAT;
+            pge2dinfo->src_info[0].rect.x = 0;
+            pge2dinfo->src_info[0].rect.y = 0;
+            pge2dinfo->src_info[0].rect.w = pge2dinfo->src_info[0].canvas_w;
+            pge2dinfo->src_info[0].rect.h = pge2dinfo->src_info[0].canvas_h;
+            pge2dinfo->src_info[0].shared_fd = shared_fd_bakup;
+            pge2dinfo->src_info[0].offset = offset_bakup;
+            pge2dinfo->src_info[0].fill_color_en = 0;
+
+            pge2dinfo->src_info[1].canvas_w = pge2dinfo->dst_info.canvas_w;
+            pge2dinfo->src_info[1].canvas_h = pge2dinfo->dst_info.canvas_h;
+            pge2dinfo->src_info[1].format = pge2dinfo->dst_info.format;
+            pge2dinfo->src_info[1].rect.x = pge2dinfo->dst_info.rect.x;
+            pge2dinfo->src_info[1].rect.y = pge2dinfo->dst_info.rect.y;
+            pge2dinfo->src_info[1].rect.w = pge2dinfo->dst_info.rect.w;
+            pge2dinfo->src_info[1].rect.h = pge2dinfo->dst_info.rect.h;
+            pge2dinfo->src_info[1].shared_fd = pge2dinfo->dst_info.shared_fd;
+            pge2dinfo->src_info[1].offset = pge2dinfo->dst_info.offset;
+            pge2dinfo->src_info[1].fill_color_en = 0;
+
+            pge2dinfo->dst_info.canvas_w = SX_DST;
+            pge2dinfo->dst_info.canvas_h = SY_DST;
+            pge2dinfo->dst_info.format = DST_PIXFORMAT;
+            pge2dinfo->dst_info.rect.x = 0;
+            pge2dinfo->dst_info.rect.y = 0;
+            pge2dinfo->dst_info.rect.w = pge2dinfo->src_info[0].canvas_w;
+            pge2dinfo->dst_info.rect.h = pge2dinfo->src_info[0].canvas_h;
+            pge2dinfo->dst_info.rotation = GE2D_ROTATION_0;
+
+            pge2dinfo->src_info[0].layer_mode = src1_layer_mode;
+            pge2dinfo->src_info[1].layer_mode = src2_layer_mode;
+            pge2dinfo->src_info[0].plane_alpha = gb1_alpha;
+            pge2dinfo->src_info[1].plane_alpha = gb2_alpha;
+            ret = aml_ge2d_process(pge2dinfo);
+        }
+    } else  if (src2_layer_mode == LAYER_MODE_COVERAGE){
+        printf("two steps blend,src2 LAYER_MODE_COVERAGE: two blend\n");
+        ret = aml_read_file_src1(SRC1_FILE_NAME,pge2dinfo);
+        if (ret < 0)
+            return ge2d_fail;
+        /* both plane alpha, do 2 steps */
+        /* step 1: strechbilt */
+        pge2dinfo->ge2d_op = AML_GE2D_BLEND;
+        /* src2 do strechbilt to dst */
+        pge2dinfo->src_info[0].canvas_w = SX_SRC1;
+        pge2dinfo->src_info[0].canvas_h = SY_SRC1;
+        pge2dinfo->src_info[0].format = SRC1_PIXFORMAT;
+        pge2dinfo->src_info[0].rect.x = 0;
+        pge2dinfo->src_info[0].rect.y = 0;
+        pge2dinfo->src_info[0].rect.w = pge2dinfo->src_info[0].canvas_w;
+        pge2dinfo->src_info[0].rect.h = pge2dinfo->src_info[0].canvas_h;
+        pge2dinfo->src_info[0].fill_color_en = 0;
+
+        pge2dinfo->src_info[1].canvas_w = SX_DST;
+        pge2dinfo->src_info[1].canvas_h = SY_DST;
+        pge2dinfo->src_info[1].format = DST_PIXFORMAT;
+        pge2dinfo->src_info[1].rect.x = 0;
+        pge2dinfo->src_info[1].rect.y = 0;
+        pge2dinfo->src_info[1].rect.w = pge2dinfo->src_info[0].canvas_w;
+        pge2dinfo->src_info[1].rect.h = pge2dinfo->src_info[0].canvas_h;
+        pge2dinfo->src_info[1].fill_color_en = 1;
+        pge2dinfo->src_info[1].def_color = 0x00;
+
+        pge2dinfo->dst_info.canvas_w = SX_DST;
+        pge2dinfo->dst_info.canvas_h = SY_DST;
+        pge2dinfo->dst_info.format = DST_PIXFORMAT;
+        pge2dinfo->dst_info.rect.x = 0;
+        pge2dinfo->dst_info.rect.y = 0;
+        pge2dinfo->dst_info.rect.w = pge2dinfo->src_info[0].canvas_w;
+        pge2dinfo->dst_info.rect.h = pge2dinfo->src_info[0].canvas_h;
+        pge2dinfo->dst_info.rotation = GE2D_ROTATION_0;
+
+        pge2dinfo->src_info[0].layer_mode = LAYER_MODE_COVERAGE;
+        pge2dinfo->src_info[1].layer_mode = LAYER_MODE_COVERAGE;
+        pge2dinfo->src_info[0].plane_alpha = gb2_alpha;
+        pge2dinfo->src_info[1].plane_alpha = 0xff;
+        ret = aml_ge2d_process(pge2dinfo);
+        ret = aml_read_file_src1(SRC_FILE_NAME,pge2dinfo);
+        if (ret < 0)
+            return ge2d_fail;
+        /* step2: blend src1 blend src2(dst) to dst */
+        pge2dinfo->ge2d_op = AML_GE2D_BLEND;
+
+        pge2dinfo->src_info[0].canvas_w = SX_SRC1;
+        pge2dinfo->src_info[0].canvas_h = SY_SRC1;
+        pge2dinfo->src_info[0].format = SRC1_PIXFORMAT;
+        pge2dinfo->src_info[0].rect.x = 0;
+        pge2dinfo->src_info[0].rect.y = 0;
+        pge2dinfo->src_info[0].rect.w = pge2dinfo->src_info[0].canvas_w;
+        pge2dinfo->src_info[0].rect.h = pge2dinfo->src_info[0].canvas_h;
+        pge2dinfo->src_info[0].fill_color_en = 0;
+
+        pge2dinfo->src_info[1].canvas_w = pge2dinfo->dst_info.canvas_w;
+        pge2dinfo->src_info[1].canvas_h = pge2dinfo->dst_info.canvas_h;
+        pge2dinfo->src_info[1].format = pge2dinfo->dst_info.format;
+        pge2dinfo->src_info[1].rect.x = pge2dinfo->dst_info.rect.x;
+        pge2dinfo->src_info[1].rect.y = pge2dinfo->dst_info.rect.y;
+        pge2dinfo->src_info[1].rect.w = pge2dinfo->dst_info.rect.w;
+        pge2dinfo->src_info[1].rect.h = pge2dinfo->dst_info.rect.h;
+        pge2dinfo->src_info[1].shared_fd = pge2dinfo->dst_info.shared_fd;
+        pge2dinfo->src_info[1].offset = pge2dinfo->dst_info.offset;
+        pge2dinfo->src_info[1].fill_color_en = 0;
+
+        pge2dinfo->dst_info.canvas_w = SX_DST;
+        pge2dinfo->dst_info.canvas_h = SY_DST;
+        pge2dinfo->dst_info.format = DST_PIXFORMAT;
+        pge2dinfo->dst_info.rect.x = 0;
+        pge2dinfo->dst_info.rect.y = 0;
+        pge2dinfo->dst_info.rect.w = pge2dinfo->src_info[0].canvas_w;
+        pge2dinfo->dst_info.rect.h = pge2dinfo->src_info[0].canvas_h;
+        pge2dinfo->dst_info.rotation = GE2D_ROTATION_0;
+
+        pge2dinfo->src_info[0].layer_mode = src1_layer_mode;
+        pge2dinfo->src_info[1].layer_mode = src2_layer_mode;
+        pge2dinfo->src_info[0].plane_alpha = gb1_alpha;
+        pge2dinfo->src_info[1].plane_alpha = gb2_alpha;
+        ret = aml_ge2d_process(pge2dinfo);
+    } else if ((src2_layer_mode == LAYER_MODE_NON)
+        && (src1_layer_mode != LAYER_MODE_PREMULTIPLIED)){
+        printf("two steps blend,src2 LAYER_MODE_NON:strechbilt+blend\n");
+        ret = aml_read_file_src1(SRC_FILE_NAME,pge2dinfo);
+        if (ret < 0)
+            return ge2d_fail;
+        ret = aml_read_file_src2(SRC1_FILE_NAME,pge2dinfo);
+        if (ret < 0)
+            return ge2d_fail;
+        /* both plane alpha, do 2 steps */
+        /* step 1: strechbilt */
+        pge2dinfo->ge2d_op = AML_GE2D_STRETCHBLIT;
+        /* src2 do strechbilt to dst */
+        pge2dinfo->src_info[0].canvas_w = SX_SRC2;
+        pge2dinfo->src_info[0].canvas_h = SY_SRC2;
+        pge2dinfo->src_info[0].format = SRC2_PIXFORMAT;
+        pge2dinfo->src_info[0].rect.x = 0;
+        pge2dinfo->src_info[0].rect.y = 0;
+        pge2dinfo->src_info[0].rect.w = pge2dinfo->src_info[0].canvas_w;
+        pge2dinfo->src_info[0].rect.h = pge2dinfo->src_info[0].canvas_h;
+
+        shared_fd_bakup = pge2dinfo->src_info[0].shared_fd;
+        offset_bakup = pge2dinfo->src_info[0].offset;
+        pge2dinfo->src_info[0].shared_fd = pge2dinfo->src_info[1].shared_fd;
+        pge2dinfo->src_info[0].offset = pge2dinfo->src_info[1].offset;
+        pge2dinfo->src_info[0].layer_mode = src2_layer_mode;
+        pge2dinfo->src_info[0].plane_alpha = 0xff;
+        pge2dinfo->src_info[0].format = PIXEL_FORMAT_RGBX_8888;
+
+        pge2dinfo->dst_info.canvas_w = SX_DST;
+        pge2dinfo->dst_info.canvas_h = SY_DST;
+        pge2dinfo->dst_info.format = DST_PIXFORMAT;
+        pge2dinfo->dst_info.rect.x = 0;
+        pge2dinfo->dst_info.rect.y = 0;
+        pge2dinfo->dst_info.rect.w = pge2dinfo->src_info[0].canvas_w;
+        pge2dinfo->dst_info.rect.h = pge2dinfo->src_info[0].canvas_h;
+        pge2dinfo->dst_info.rotation = GE2D_ROTATION_0;
+        ret = aml_ge2d_process(pge2dinfo);
+
+        /* step2: blend src1 blend src2(dst) to dst */
+        pge2dinfo->ge2d_op = AML_GE2D_BLEND;
+
+        pge2dinfo->src_info[0].canvas_w = SX_SRC1;
+        pge2dinfo->src_info[0].canvas_h = SY_SRC1;
+        pge2dinfo->src_info[0].format = SRC1_PIXFORMAT;
+        pge2dinfo->src_info[0].rect.x = 0;
+        pge2dinfo->src_info[0].rect.y = 0;
+        pge2dinfo->src_info[0].rect.w = pge2dinfo->src_info[0].canvas_w;
+        pge2dinfo->src_info[0].rect.h = pge2dinfo->src_info[0].canvas_h;
+        pge2dinfo->src_info[0].shared_fd = shared_fd_bakup;
+        pge2dinfo->src_info[0].offset = offset_bakup;
+        pge2dinfo->src_info[0].fill_color_en = 0;
+
+        pge2dinfo->src_info[1].canvas_w = pge2dinfo->dst_info.canvas_w;
+        pge2dinfo->src_info[1].canvas_h = pge2dinfo->dst_info.canvas_h;
+        pge2dinfo->src_info[1].format = pge2dinfo->dst_info.format;
+        pge2dinfo->src_info[1].rect.x = pge2dinfo->dst_info.rect.x;
+        pge2dinfo->src_info[1].rect.y = pge2dinfo->dst_info.rect.y;
+        pge2dinfo->src_info[1].rect.w = pge2dinfo->dst_info.rect.w;
+        pge2dinfo->src_info[1].rect.h = pge2dinfo->dst_info.rect.h;
+        pge2dinfo->src_info[1].shared_fd = pge2dinfo->dst_info.shared_fd;
+        pge2dinfo->src_info[1].offset = pge2dinfo->dst_info.offset;
+        pge2dinfo->src_info[1].fill_color_en = 0;
+
+        pge2dinfo->dst_info.canvas_w = SX_DST;
+        pge2dinfo->dst_info.canvas_h = SY_DST;
+        pge2dinfo->dst_info.format = DST_PIXFORMAT;
+        pge2dinfo->dst_info.rect.x = 0;
+        pge2dinfo->dst_info.rect.y = 0;
+        pge2dinfo->dst_info.rect.w = pge2dinfo->src_info[0].canvas_w;
+        pge2dinfo->dst_info.rect.h = pge2dinfo->src_info[0].canvas_h;
+        pge2dinfo->dst_info.rotation = GE2D_ROTATION_0;
+        printf("two steps blend,src1_layer_mode=%d,src2_layer_mode=%d\n",src1_layer_mode,src2_layer_mode);
+
+        pge2dinfo->src_info[0].layer_mode = src1_layer_mode;
+        pge2dinfo->src_info[1].layer_mode = src2_layer_mode;
+        pge2dinfo->src_info[0].plane_alpha = gb1_alpha;
+        pge2dinfo->src_info[1].plane_alpha = gb2_alpha;
+        ret = aml_ge2d_process(pge2dinfo);
+    }  else {
+        /* do blend src1 blend src2(dst) to dst */
+        printf("one step blend\n");
+        ret = aml_read_file_src1(SRC_FILE_NAME,pge2dinfo);
+        if (ret < 0)
+           return  ge2d_fail;
+        ret = aml_read_file_src2(SRC1_FILE_NAME,pge2dinfo);
+        if (ret < 0)
+           return ge2d_fail;
+        pge2dinfo->src_info[0].canvas_w = SX_SRC1;
+        pge2dinfo->src_info[0].canvas_h = SY_SRC1;
+        pge2dinfo->src_info[0].format = SRC1_PIXFORMAT;
+        pge2dinfo->src_info[0].rect.x = 0;
+        pge2dinfo->src_info[0].rect.y = 0;
+        pge2dinfo->src_info[0].rect.w = pge2dinfo->src_info[0].canvas_w;
+        pge2dinfo->src_info[0].rect.h = pge2dinfo->src_info[0].canvas_h;
+        pge2dinfo->src_info[0].fill_color_en = 0;
+
+        pge2dinfo->src_info[1].canvas_w = SX_SRC2;
+        pge2dinfo->src_info[1].canvas_h = SY_SRC2;
+        pge2dinfo->src_info[1].format = SRC2_PIXFORMAT;
+        pge2dinfo->src_info[1].rect.x = 0;
+        pge2dinfo->src_info[1].rect.y = 0;
+        pge2dinfo->src_info[1].rect.w = pge2dinfo->src_info[0].canvas_w;
+        pge2dinfo->src_info[1].rect.h = pge2dinfo->src_info[0].canvas_h;
+        pge2dinfo->src_info[1].fill_color_en = 0;
+        if (src2_layer_mode == LAYER_MODE_NON)
+            pge2dinfo->src_info[0].format = PIXEL_FORMAT_RGBX_8888;
+        pge2dinfo->dst_info.canvas_w = SX_DST;
+        pge2dinfo->dst_info.canvas_h = SY_DST;
+        pge2dinfo->dst_info.format = DST_PIXFORMAT;
+        pge2dinfo->dst_info.rect.x = 0;
+        pge2dinfo->dst_info.rect.y = 0;
+        pge2dinfo->dst_info.rect.w = pge2dinfo->src_info[0].canvas_w;
+        pge2dinfo->dst_info.rect.h = pge2dinfo->src_info[0].canvas_h;
+        pge2dinfo->dst_info.rotation = GE2D_ROTATION_0;
+
+        pge2dinfo->src_info[0].layer_mode = src1_layer_mode;
+        pge2dinfo->src_info[1].layer_mode = src2_layer_mode;
+        pge2dinfo->src_info[0].plane_alpha = gb1_alpha;
+        pge2dinfo->src_info[1].plane_alpha = gb2_alpha;
+        ret = aml_ge2d_process(pge2dinfo);
+    }
     return ret;
 }
-
 
 static int do_strechblit(aml_ge2d_info_t *pge2dinfo)
 {
     int ret = -1;
     char code = 0;
     printf("do_strechblit test case:\n");
+    ret = aml_read_file_src1(SRC_FILE_NAME,pge2dinfo);
+    if (ret < 0)
+       return ge2d_fail;
+    ret = aml_read_file_src2(SRC1_FILE_NAME,pge2dinfo);
+    if (ret < 0)
+       return ge2d_fail;
+
     pge2dinfo->src_info[0].memtype = GE2D_CANVAS_ALLOC;
-    pge2dinfo->dst_info.memtype = GE2D_CANVAS_OSD0;
+    pge2dinfo->dst_info.memtype = GE2D_CANVAS_ALLOC;
     pge2dinfo->src_info[0].canvas_w = SX_SRC1;
     pge2dinfo->src_info[0].canvas_h = SY_SRC1;
     pge2dinfo->src_info[0].format = SRC1_PIXFORMAT;
@@ -299,6 +682,9 @@ static int do_strechblit(aml_ge2d_info_t *pge2dinfo)
     pge2dinfo->dst_info.rect.w = SX_DST;
     pge2dinfo->dst_info.rect.h = SY_DST;
     pge2dinfo->dst_info.rotation = GE2D_ROTATION_0;
+    pge2dinfo->src_info[0].layer_mode = src1_layer_mode;
+    pge2dinfo->src_info[0].plane_alpha = gb1_alpha;
+
     ret = aml_ge2d_process(pge2dinfo);
     sleep(5);
 
@@ -316,6 +702,13 @@ static int do_blit(aml_ge2d_info_t *pge2dinfo)
     int ret = -1;
     char code = 0;
     printf("do_blit test case:\n");
+    ret = aml_read_file_src1(SRC_FILE_NAME,pge2dinfo);
+    if (ret < 0)
+       return ge2d_fail;
+    ret = aml_read_file_src2(SRC1_FILE_NAME,pge2dinfo);
+    if (ret < 0)
+       return ge2d_fail;
+
     pge2dinfo->src_info[0].memtype = GE2D_CANVAS_ALLOC;
     pge2dinfo->dst_info.memtype = GE2D_CANVAS_ALLOC;
     pge2dinfo->src_info[0].canvas_w = SX_SRC1;
@@ -333,6 +726,9 @@ static int do_blit(aml_ge2d_info_t *pge2dinfo)
     pge2dinfo->dst_info.rect.y = 0;
 
     pge2dinfo->dst_info.rotation = GE2D_ROTATION_0;
+    pge2dinfo->src_info[0].layer_mode = src1_layer_mode;
+    pge2dinfo->src_info[0].plane_alpha = gb1_alpha;
+
     ret = aml_ge2d_process(pge2dinfo);
     sleep(5);
 
@@ -374,15 +770,6 @@ int main(int argc, char **argv)
         return ge2d_fail;
 
     ret = aml_ge2d_mem_alloc(&ge2dinfo);
-    if (ret < 0)
-        goto exit;
-
-
-    ret = aml_read_file_src1(SRC_FILE_NAME,&ge2dinfo);
-    if (ret < 0)
-        goto exit;
-
-    ret = aml_read_file_src2(SRC1_FILE_NAME,&ge2dinfo);
     if (ret < 0)
         goto exit;
 

@@ -16,6 +16,7 @@
 #define OSD0        0
 #define OSD1        1
 
+#define SRC1_GB_ALPHA_ENABLE 0x80000000
 
 #if defined (__cplusplus)
 extern "C" {
@@ -28,6 +29,12 @@ typedef enum {
     GE2D_CANVAS_TYPE_INVALID,
 }ge2d_canvas_t;
 
+typedef enum {
+    LAYER_MODE_INVALID = 0,
+    LAYER_MODE_NON = 1,
+    LAYER_MODE_PREMULTIPLIED = 2,
+    LAYER_MODE_COVERAGE = 3,
+} layer_mode_t;
 
 /* Blend modes, settable per layer */
 typedef enum {
@@ -43,13 +50,9 @@ typedef enum {
     BLEND_MODE_COVERAGE = 3,
 } blend_mode_t;
 
-
-
-
 /**
  * pixel format definitions
  */
-
 typedef enum  {
     PIXEL_FORMAT_RGBA_8888          = 1,
     PIXEL_FORMAT_RGBX_8888          = 2,
@@ -70,7 +73,6 @@ typedef enum {
     GE2D_ROTATION_270,
 } GE2D_ROTATION;
 
-
 typedef enum {
     AML_GE2D_FILLRECTANGLE,
     AML_GE2D_BLEND,
@@ -79,14 +81,12 @@ typedef enum {
     AML_GE2D_NONE,
 } GE2DOP;
 
-
 typedef struct{
     int x;
     int y;
     int w;
     int h;
 }rectangle_t;
-
 
 typedef struct buffer_info {
     unsigned int memtype;
@@ -98,9 +98,11 @@ typedef struct buffer_info {
     int format;
     unsigned int rotation;
     int shared_fd;
+    unsigned char plane_alpha;
+    unsigned char layer_mode;
+    unsigned char fill_color_en;
+    unsigned int  def_color;
 } buffer_info_t;
-
-
 
 typedef struct aml_ge2d_info {
     unsigned int offset;
@@ -110,8 +112,9 @@ typedef struct aml_ge2d_info {
     buffer_info_t dst_info;
     unsigned int color;
     unsigned int gl_alpha;
+    unsigned int const_color;
+    unsigned int reserved;
 } aml_ge2d_info_t;
-
 
 int ge2d_open(void);
 int ge2d_close(int fd);

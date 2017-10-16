@@ -242,7 +242,7 @@ exit:
 int aml_ge2d_process(aml_ge2d_info_t *pge2dinfo)
 {
     int ret = -1;
-    if (fd_ge2d > 0)
+    if (fd_ge2d >= 0)
         ret = ge2d_process(fd_ge2d,pge2dinfo);
     return ret;
 }

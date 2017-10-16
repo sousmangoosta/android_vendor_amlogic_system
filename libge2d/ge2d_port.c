@@ -279,8 +279,8 @@ static int ge2d_fillrectangle_config_ex_ion(int fd,aml_ge2d_info_t *pge2dinfo)
             return ge2d_fail;
         }
     }
-    ge2d_config_ex.alu_const_color = 0x00000000;
-    ge2d_config_ex.src1_gb_alpha = 0x00;
+    ge2d_config_ex.alu_const_color = pge2dinfo->const_color;
+    ge2d_config_ex.src1_gb_alpha = input_buffer_info->plane_alpha & 0xff;
 
     ret = ioctl(fd, GE2D_CONFIG_EX_ION, &ge2d_config_ex);
     if (ret < 0) {
@@ -347,6 +347,12 @@ static int ge2d_blit_config_ex_ion(int fd,aml_ge2d_info_t *pge2dinfo)
     ge2d_config_ex.dst_para.top = 0;
     ge2d_config_ex.dst_para.width = d_canvas_w;
     ge2d_config_ex.dst_para.height = d_canvas_h;
+    if (input_buffer_info->layer_mode == LAYER_MODE_PREMULTIPLIED)
+        ge2d_config_ex.src1_cmult_asel = 2;
+    else if (input_buffer_info->layer_mode == LAYER_MODE_COVERAGE)
+        ge2d_config_ex.src1_cmult_asel = 0;
+    else if (input_buffer_info->layer_mode == LAYER_MODE_NON)
+        ge2d_config_ex.src1_cmult_asel = 0;
 
     switch (pge2dinfo->src_info[0].rotation) {
         case GE2D_ROTATION_0:
@@ -488,8 +494,15 @@ static int ge2d_blit_config_ex_ion(int fd,aml_ge2d_info_t *pge2dinfo)
         }
     }
 
-    ge2d_config_ex.alu_const_color = 0x00000000;
-    ge2d_config_ex.src1_gb_alpha = 0x00;
+    ge2d_config_ex.alu_const_color = pge2dinfo->const_color;
+    ge2d_config_ex.src1_gb_alpha = input_buffer_info->plane_alpha & 0xff;
+    ge2d_config_ex.src1_gb_alpha_en = 1;
+    D_GE2D("bilt:src1_cmult_asel=%d,src2_cmult_ase2=%d,gl_alpha=%x,src1_gb_alpha_en=%d\n",
+        ge2d_config_ex.src1_cmult_asel,
+        ge2d_config_ex.src2_cmult_asel,
+        ge2d_config_ex.src1_gb_alpha,
+        ge2d_config_ex.src1_gb_alpha_en);
+
     ret = ioctl(fd, GE2D_CONFIG_EX_ION, &ge2d_config_ex);
     if (ret < 0) {
         E_GE2D("ge2d config ex ion failed. \n");
@@ -524,9 +537,21 @@ static int ge2d_blend_config_ex_ion(int fd,aml_ge2d_info_t *pge2dinfo)
         b_src_swap = 1;
         D_GE2D("NOTE:src2 not support nv21/nv12, swap src1 and src2!\n");
     }
+    else if ((input_buffer_info->plane_alpha == 0xff) &&
+        (input2_buffer_info->plane_alpha != 0xff) &&
+        (input_buffer_info->layer_mode != LAYER_MODE_NON) &&
+        (input2_buffer_info->layer_mode == LAYER_MODE_PREMULTIPLIED)) {
+        /* swap src1 and src2 buffer to process plane alpha*/
+        /* TODO: need check the src1 rect and src2 rect */
+        input_buffer_info = &pge2dinfo->src_info[1];
+        input2_buffer_info = &pge2dinfo->src_info[0];
+        //pge2dinfo->gl_alpha &= SRC1_GB_ALPHA_ENABLE;
+        //pge2dinfo->gl_alpha |= (input_buffer_info->plane_alpha & 0xff);
+        b_src_swap = 1;
+    }
     else
         b_src_swap = 0;
-
+    D_GE2D("b_src_swap=%d\n",b_src_swap);
     memset(&ge2d_config_ex, 0, sizeof(struct config_para_ex_ion_s ));
 
     if (CANVAS_ALLOC == input_buffer_info->memtype) {
@@ -573,6 +598,15 @@ static int ge2d_blend_config_ex_ion(int fd,aml_ge2d_info_t *pge2dinfo)
     ge2d_config_ex.src_para.top = input_buffer_info->rect.y;
     ge2d_config_ex.src_para.width = input_buffer_info->rect.w;
     ge2d_config_ex.src_para.height = input_buffer_info->rect.h;
+    ge2d_config_ex.src_para.color = input_buffer_info->def_color;
+    ge2d_config_ex.src_para.fill_color_en = input_buffer_info->fill_color_en;
+
+    if (input_buffer_info->layer_mode == LAYER_MODE_PREMULTIPLIED)
+        ge2d_config_ex.src1_cmult_asel = 2;
+    else if (input_buffer_info->layer_mode == LAYER_MODE_COVERAGE)
+        ge2d_config_ex.src1_cmult_asel = 0;
+    else if (input_buffer_info->layer_mode == LAYER_MODE_NON)
+        ge2d_config_ex.src1_cmult_asel = 0;
 
     ge2d_config_ex.src2_para.mem_type = input2_buffer_info->memtype;
     ge2d_config_ex.src2_para.format = src2_format;
@@ -580,6 +614,9 @@ static int ge2d_blend_config_ex_ion(int fd,aml_ge2d_info_t *pge2dinfo)
     ge2d_config_ex.src2_para.top = input2_buffer_info->rect.y;
     ge2d_config_ex.src2_para.width = input2_buffer_info->rect.w;
     ge2d_config_ex.src2_para.height = input2_buffer_info->rect.h;
+    ge2d_config_ex.src2_para.color = input2_buffer_info->def_color;
+    ge2d_config_ex.src2_para.fill_color_en = input2_buffer_info->fill_color_en;
+    ge2d_config_ex.src2_cmult_asel = 0;
 
     ge2d_config_ex.dst_para.mem_type = output_buffer_info->memtype;
     ge2d_config_ex.dst_para.format = dst_format;
@@ -797,8 +834,15 @@ static int ge2d_blend_config_ex_ion(int fd,aml_ge2d_info_t *pge2dinfo)
             return ge2d_fail;
         }
     }
-    ge2d_config_ex.alu_const_color = 0x00000000;
-    ge2d_config_ex.src1_gb_alpha = 0x00;
+    ge2d_config_ex.alu_const_color = pge2dinfo->const_color;
+    ge2d_config_ex.src1_gb_alpha = input_buffer_info->plane_alpha & 0xff;
+    ge2d_config_ex.src1_gb_alpha_en = 1;
+
+    D_GE2D("blend:src1_cmult_asel=%d,src2_cmult_ase2=%d,gl_alpha=%x,src1_gb_alpha_en=%d\n",
+        ge2d_config_ex.src1_cmult_asel,
+        ge2d_config_ex.src2_cmult_asel,
+        ge2d_config_ex.src1_gb_alpha,
+        ge2d_config_ex.src1_gb_alpha_en);
     ret = ioctl(fd, GE2D_CONFIG_EX_ION, &ge2d_config_ex);
     if (ret < 0) {
         E_GE2D("ge2d config ex ion failed. \n");
@@ -956,6 +1000,7 @@ static int ge2d_blend(int fd,rectangle_t *srect,rectangle_t *srect2,rectangle_t 
         srect->x,srect->y,srect->w,srect->h,
         srect2->x,srect2->y,srect2->w,srect2->h,
         drect->x,drect->y,drect->w,drect->h);
+    D_GE2D("ge2d_blend:blend_mode=%d\n",op);
     memset(&blend_op,0,sizeof(ge2d_blend_op));
     max_d_w = (srect->w > srect2->w) ? srect2->w : srect->w;
     max_d_h = (srect->h > srect2->h) ? srect2->h : srect->h;
@@ -988,35 +1033,35 @@ static int ge2d_blend(int fd,rectangle_t *srect,rectangle_t *srect2,rectangle_t 
             if (b_src_swap) {
                 blend_op.color_blending_src_factor = COLOR_FACTOR_ZERO;
                 blend_op.color_blending_dst_factor = COLOR_FACTOR_ONE;
-                blend_op.alpha_blending_src_factor = COLOR_FACTOR_ZERO;
-                blend_op.alpha_blending_dst_factor = COLOR_FACTOR_ONE;
+                blend_op.alpha_blending_src_factor = ALPHA_FACTOR_ZERO;
+                blend_op.alpha_blending_dst_factor = ALPHA_FACTOR_ONE;
             }
             else {
                 blend_op.color_blending_src_factor = COLOR_FACTOR_ONE;
                 blend_op.color_blending_dst_factor = COLOR_FACTOR_ZERO;
-                blend_op.alpha_blending_src_factor = COLOR_FACTOR_ONE;
-                blend_op.alpha_blending_dst_factor = COLOR_FACTOR_ZERO;
+                blend_op.alpha_blending_src_factor = ALPHA_FACTOR_ONE;
+                blend_op.alpha_blending_dst_factor = ALPHA_FACTOR_ZERO;
             }
             break;
         case BLEND_MODE_PREMULTIPLIED:
             if (b_src_swap) {
                 blend_op.color_blending_src_factor = COLOR_FACTOR_ONE_MINUS_DST_ALPHA;
                 blend_op.color_blending_dst_factor = COLOR_FACTOR_ONE;
-                blend_op.alpha_blending_src_factor = COLOR_FACTOR_ONE_MINUS_DST_ALPHA;
-                blend_op.alpha_blending_dst_factor = COLOR_FACTOR_ONE;
+                blend_op.alpha_blending_src_factor = ALPHA_FACTOR_ONE_MINUS_DST_ALPHA;
+                blend_op.alpha_blending_dst_factor = ALPHA_FACTOR_ONE;
             }
             else {
                 blend_op.color_blending_src_factor = COLOR_FACTOR_ONE;
                 blend_op.color_blending_dst_factor = COLOR_FACTOR_ONE_MINUS_SRC_ALPHA;
-                blend_op.alpha_blending_src_factor = COLOR_FACTOR_ONE;
-                blend_op.alpha_blending_dst_factor = COLOR_FACTOR_ONE_MINUS_SRC_ALPHA;
+                blend_op.alpha_blending_src_factor = ALPHA_FACTOR_ONE;
+                blend_op.alpha_blending_dst_factor = ALPHA_FACTOR_ONE_MINUS_SRC_ALPHA;
             }
             break;
         case BLEND_MODE_COVERAGE:
             if (b_src_swap) {
                 blend_op.color_blending_src_factor = COLOR_FACTOR_ONE_MINUS_DST_ALPHA;
-                blend_op.color_blending_dst_factor = ALPHA_FACTOR_DST_ALPHA;
-                blend_op.alpha_blending_src_factor = ALPHA_FACTOR_ONE_MINUS_SRC_ALPHA;
+                blend_op.color_blending_dst_factor = COLOR_FACTOR_DST_ALPHA;
+                blend_op.alpha_blending_src_factor = ALPHA_FACTOR_ONE_MINUS_DST_ALPHA;
                 blend_op.alpha_blending_dst_factor = ALPHA_FACTOR_DST_ALPHA;
             }
             else {
@@ -1054,11 +1099,11 @@ static int ge2d_blend_noalpha(int fd,rectangle_t *srect,rectangle_t *srect2,rect
     ge2d_op_para_t op_ge2d_info;
     ge2d_blend_op blend_op;
     int max_d_w, max_d_h;
-
     D_GE2D("ge2d_blend srect[%d %d %d %d], s2rect[%d %d %d %d],drect[%d %d %d %d]\n",
         srect->x,srect->y,srect->w,srect->h,
         srect2->x,srect2->y,srect2->w,srect2->h,
         drect->x,drect->y,drect->w,drect->h);
+    D_GE2D("ge2d_blend_noalpha:blend_mode=%d\n",op);
     memset(&blend_op,0,sizeof(ge2d_blend_op));
     max_d_w = (srect->w > srect2->w) ? srect2->w : srect->w;
     max_d_h = (srect->h > srect2->h) ? srect2->h : srect->h;
@@ -1215,9 +1260,6 @@ int ge2d_process(int fd,aml_ge2d_info_t *pge2dinfo)
         case AML_GE2D_STRETCHBLIT:
             if (!is_rect_valid(&pge2dinfo->src_info[0]))
                 return ge2d_fail;
-            if (!is_rect_valid(&pge2dinfo->dst_info))
-                return ge2d_fail;
-
             dst_rect.w = pge2dinfo->dst_info.rect.w;
             dst_rect.h = pge2dinfo->dst_info.rect.h;
             dst_rect.x =  pge2dinfo->dst_info.rect.x;
@@ -1241,14 +1283,21 @@ int ge2d_process(int fd,aml_ge2d_info_t *pge2dinfo)
                 return ge2d_fail;
             if (!is_rect_valid(&pge2dinfo->dst_info))
                 return ge2d_fail;
-
+            if (pge2dinfo->src_info[0].layer_mode == LAYER_MODE_PREMULTIPLIED)
+                pge2dinfo->blend_mode = BLEND_MODE_PREMULTIPLIED;
+            else if (pge2dinfo->src_info[0].layer_mode == LAYER_MODE_COVERAGE)
+                pge2dinfo->blend_mode = BLEND_MODE_COVERAGE;
+            else
+                pge2dinfo->blend_mode = BLEND_MODE_NONE;
             dst_rect.w = pge2dinfo->dst_info.rect.w;
             dst_rect.h = pge2dinfo->dst_info.rect.h;
             dst_rect.x =  pge2dinfo->dst_info.rect.x;
             dst_rect.y = pge2dinfo->offset + pge2dinfo->dst_info.rect.y;
             ret = ge2d_blend_config_ex_ion(fd,pge2dinfo);
             if (ret == ge2d_success) {
-                if ((is_no_alpha(pge2dinfo->src_info[0].format)) || (is_no_alpha(pge2dinfo->src_info[1].format))) {
+                if ((is_no_alpha(pge2dinfo->src_info[0].format))
+                    || (is_no_alpha(pge2dinfo->src_info[1].format))
+                    || (pge2dinfo->src_info[0].layer_mode == LAYER_MODE_NON)) {
                     if (b_src_swap)
                         ge2d_blend_noalpha(fd,&(pge2dinfo->src_info[1].rect),
                             &(pge2dinfo->src_info[0].rect),
@@ -1257,8 +1306,7 @@ int ge2d_process(int fd,aml_ge2d_info_t *pge2dinfo)
                         ge2d_blend_noalpha(fd,&(pge2dinfo->src_info[0].rect),
                             &(pge2dinfo->src_info[1].rect),
                             &dst_rect,pge2dinfo->blend_mode);
-                }
-                else {
+                } else {
                     if (b_src_swap)
                         ge2d_blend(fd,&(pge2dinfo->src_info[1].rect),
                             &(pge2dinfo->src_info[0].rect),
