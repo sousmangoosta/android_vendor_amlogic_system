@@ -126,16 +126,26 @@ static int is_no_alpha(int format)
         return 0;
 }
 
-static int is_need_swap_src2(int format)
+static int is_need_swap_src2(int format,buffer_info_t *src2, buffer_info_t *dst)
 {
+    int ret = 0;
     /* src2 not support nv21/nv12/yv12, swap src1 and src2 */
     if ((format == PIXEL_FORMAT_YCrCb_420_SP) ||
         (format == PIXEL_FORMAT_YV12))
-        return 1;
+        ret = 1;
     else
-        return 0;
-}
+        ret = 0;
 
+    /* src2 scaler, swap src1 and src2 */
+    if (!ret) {
+        if ((src2->rect.w < dst->rect.w) ||
+            (src2->rect.h < dst->rect.h))
+            ret = 1;
+        else
+            ret = 0;
+    }
+    return ret;
+}
 
 static int is_rect_valid(buffer_info_t *pbuffer_info)
 {
@@ -531,7 +541,7 @@ static int ge2d_blend_config_ex_ion(int fd,aml_ge2d_info_t *pge2dinfo)
     buffer_info_t* input2_buffer_info = &pge2dinfo->src_info[1];
     buffer_info_t* output_buffer_info = &pge2dinfo->dst_info;
     /* src2 not support nv21/nv12/yv12, swap src1 and src2 */
-    if (is_need_swap_src2(input2_buffer_info->format)) {
+    if (is_need_swap_src2(input2_buffer_info->format, input2_buffer_info, output_buffer_info)) {
         input_buffer_info = &pge2dinfo->src_info[1];
         input2_buffer_info = &pge2dinfo->src_info[0];
         b_src_swap = 1;
@@ -1002,6 +1012,7 @@ static int ge2d_blend(int fd,rectangle_t *srect,rectangle_t *srect2,rectangle_t 
         drect->x,drect->y,drect->w,drect->h);
     D_GE2D("ge2d_blend:blend_mode=%d\n",op);
     memset(&blend_op,0,sizeof(ge2d_blend_op));
+    #if 0
     max_d_w = (srect->w > srect2->w) ? srect2->w : srect->w;
     max_d_h = (srect->h > srect2->h) ? srect2->h : srect->h;
     if ((drect->w > max_d_w) || (drect->h > max_d_h)) {
@@ -1009,7 +1020,7 @@ static int ge2d_blend(int fd,rectangle_t *srect,rectangle_t *srect2,rectangle_t 
         E_GE2D("dst rect w=%d,h=%d out of range\n",drect->w,drect->h);
         return ge2d_fail;
     }
-
+    #endif
     op_ge2d_info.src1_rect.x = srect->x;
     op_ge2d_info.src1_rect.y = srect->y;
     op_ge2d_info.src1_rect.w = srect->w;
@@ -1105,6 +1116,7 @@ static int ge2d_blend_noalpha(int fd,rectangle_t *srect,rectangle_t *srect2,rect
         drect->x,drect->y,drect->w,drect->h);
     D_GE2D("ge2d_blend_noalpha:blend_mode=%d\n",op);
     memset(&blend_op,0,sizeof(ge2d_blend_op));
+    #if 0
     max_d_w = (srect->w > srect2->w) ? srect2->w : srect->w;
     max_d_h = (srect->h > srect2->h) ? srect2->h : srect->h;
     if ((drect->w > max_d_w) || (drect->h > max_d_h)) {
@@ -1112,7 +1124,7 @@ static int ge2d_blend_noalpha(int fd,rectangle_t *srect,rectangle_t *srect2,rect
         E_GE2D("dst rect w=%d,h=%d out of range\n",drect->w,drect->h);
         return ge2d_fail;
     }
-
+    #endif
     op_ge2d_info.src1_rect.x = srect->x;
     op_ge2d_info.src1_rect.y = srect->y;
     op_ge2d_info.src1_rect.w = srect->w;
@@ -1136,34 +1148,34 @@ static int ge2d_blend_noalpha(int fd,rectangle_t *srect,rectangle_t *srect2,rect
             if (b_src_swap) {
                 blend_op.color_blending_src_factor = COLOR_FACTOR_ZERO;
                 blend_op.color_blending_dst_factor = COLOR_FACTOR_ONE;
-                blend_op.alpha_blending_src_factor = COLOR_FACTOR_ZERO;
-                blend_op.alpha_blending_dst_factor = COLOR_FACTOR_ONE;
+                blend_op.alpha_blending_src_factor = ALPHA_FACTOR_ZERO;
+                blend_op.alpha_blending_dst_factor = ALPHA_FACTOR_ONE;
             }
             else {
                 blend_op.color_blending_src_factor = COLOR_FACTOR_ONE;
                 blend_op.color_blending_dst_factor = COLOR_FACTOR_ZERO;
-                blend_op.alpha_blending_src_factor = COLOR_FACTOR_ONE;
-                blend_op.alpha_blending_dst_factor = COLOR_FACTOR_ZERO;
+                blend_op.alpha_blending_src_factor = ALPHA_FACTOR_ONE;
+                blend_op.alpha_blending_dst_factor = ALPHA_FACTOR_ZERO;
             }
             break;
         case BLEND_MODE_PREMULTIPLIED:
             if (b_src_swap) {
                 blend_op.color_blending_src_factor = COLOR_FACTOR_ONE_MINUS_DST_ALPHA;
                 blend_op.color_blending_dst_factor = COLOR_FACTOR_ONE;
-                blend_op.alpha_blending_src_factor = COLOR_FACTOR_ONE_MINUS_DST_ALPHA;
-                blend_op.alpha_blending_dst_factor = COLOR_FACTOR_ONE;
+                blend_op.alpha_blending_src_factor = ALPHA_FACTOR_ONE_MINUS_DST_ALPHA;
+                blend_op.alpha_blending_dst_factor = ALPHA_FACTOR_ONE;
             }
             else {
                 blend_op.color_blending_src_factor = COLOR_FACTOR_ONE;
                 blend_op.color_blending_dst_factor = COLOR_FACTOR_ONE_MINUS_SRC_ALPHA;
-                blend_op.alpha_blending_src_factor = COLOR_FACTOR_ONE;
-                blend_op.alpha_blending_dst_factor = COLOR_FACTOR_ONE_MINUS_SRC_ALPHA;
+                blend_op.alpha_blending_src_factor = ALPHA_FACTOR_ONE;
+                blend_op.alpha_blending_dst_factor = ALPHA_FACTOR_ONE_MINUS_SRC_ALPHA;
             }
             break;
         case BLEND_MODE_COVERAGE:
             if (b_src_swap) {
                 blend_op.color_blending_src_factor = COLOR_FACTOR_ONE_MINUS_DST_ALPHA;
-                blend_op.color_blending_dst_factor = ALPHA_FACTOR_DST_ALPHA;
+                blend_op.color_blending_dst_factor = COLOR_FACTOR_DST_ALPHA;
                 blend_op.alpha_blending_src_factor = ALPHA_FACTOR_ONE_MINUS_SRC_ALPHA;
                 blend_op.alpha_blending_dst_factor = ALPHA_FACTOR_DST_ALPHA;
             }
